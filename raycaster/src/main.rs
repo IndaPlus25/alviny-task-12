@@ -40,7 +40,7 @@ pub fn main() -> GameResult {
     let context_builder = ContextBuilder::new("raycaster", "alvinino")
         .window_setup(
             conf::WindowSetup::default()
-                .title("NØllan Purgatory") // Set window title "Schack"
+                .title("NØllan Purgatory") // Set window title
                 //.icon("/icon.png"), // Set application icon
         )
         .window_mode(
