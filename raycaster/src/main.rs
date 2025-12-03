@@ -1,11 +1,98 @@
 use core::panic;
 use std::{env::args, fs};
-use ggez::{Context, ContextBuilder, GameResult, conf, event, mint::Point2};
+use ggez::{Context, ContextBuilder, GameResult, conf, event, graphics::{self, Canvas, Color, DrawParam, Rect}, mint::Point2};
 
 const DEFAULT_CELL_SIZE: u32 = 100;
 
-#[derive(Debug)]
+const BLACK: Color = Color::new(0f32, 0f32, 0f32, 1f32);
+
+const GRAY: Color = Color::new(128.0/255.0, 128.0/255.0, 128.0/255.0, 1f32);
+
+const WHITE: Color = Color::new(1f32, 1f32, 1f32, 1f32);
+
+const RED: Color = Color::new(1f32, 0f32, 0f32, 1f32);
+const BLUE: Color = Color::new(0f32, 0f32, 1f32, 1f32);
+
+#[derive(Debug, PartialEq)]
 enum CellState {Wall, Hallway}
+impl CellState {
+    fn draw(&self,  canvas: &mut Canvas, ctx: &mut Context, coords: Point2<u32>, cell_size: u32) -> GameResult {
+        let color: Color = match &self {
+            CellState::Wall => GRAY,
+            CellState::Hallway => WHITE,
+        };
+
+        let rect = Rect::new(
+            (coords.x * cell_size) as f32, 
+            (coords.y * cell_size) as f32, 
+            cell_size as f32, 
+            cell_size as f32
+        );
+        let rect_mesh = graphics::Mesh::new_rectangle(
+            ctx, 
+            graphics::DrawMode::fill(), 
+            rect,
+            color
+        )?;
+
+        let border_width = cell_size/20;
+        let border_color = BLACK;
+
+        let outline_mesh_top = graphics::Mesh::new_rectangle(
+            ctx, 
+            graphics::DrawMode::fill(), 
+            Rect::new(
+            (coords.x * cell_size) as f32, 
+            (coords.y * cell_size) as f32, 
+            cell_size as f32, 
+            border_width as f32,
+            ),
+            border_color
+        )?;
+        let outline_mesh_right = graphics::Mesh::new_rectangle(
+            ctx, 
+            graphics::DrawMode::fill(), 
+            Rect::new(
+            ((coords.x + 1) * cell_size - border_width) as f32, 
+            (coords.y * cell_size) as f32, 
+            border_width as f32, 
+            cell_size as f32,
+            ),
+            border_color
+        )?;
+        let outline_mesh_bottom = graphics::Mesh::new_rectangle(
+            ctx, 
+            graphics::DrawMode::fill(), 
+            Rect::new(
+            (coords.x * cell_size) as f32, 
+            ((coords.y + 1) * cell_size - border_width) as f32, 
+            cell_size as f32, 
+            border_width as f32,
+            ),
+            border_color
+        )?;
+        let outline_mesh_left = graphics::Mesh::new_rectangle(
+            ctx, 
+            graphics::DrawMode::fill(), 
+            Rect::new(
+            (coords.x * cell_size) as f32, 
+            (coords.y * cell_size) as f32, 
+            border_width as f32, 
+            cell_size as f32,
+            ),
+            border_color
+        )?;
+        canvas.draw(&rect_mesh, DrawParam::default());
+        if *self == CellState::Wall {
+            canvas.draw(&outline_mesh_top, DrawParam::default());
+            canvas.draw(&outline_mesh_right, DrawParam::default());
+            canvas.draw(&outline_mesh_bottom, DrawParam::default());
+            canvas.draw(&outline_mesh_left, DrawParam::default());
+        }
+        
+        Ok(())
+    }
+}
 
 #[derive(Debug)]
 struct CellMap {
@@ -42,24 +129,36 @@ impl CellMap {
 struct AppState {
     player_position: Point2<f32>,
     player_direction: f32, // Player direction in degrees. 0 means straight right.
-    map: Vec<Vec<CellState>>
+    map: Vec<Vec<CellState>>,
+    cell_size: u32, //cell size in px
 }
 impl AppState {
-    fn new(_context: &mut Context, map: Vec<Vec<CellState>>) -> Option<AppState> {
+    fn new(_context: &mut Context, map: Vec<Vec<CellState>>, cell_size: u32) -> Option<AppState> {
         Some(AppState{
             player_position: Point2::from([0f32, 0f32]),
             player_direction: 0f32,
             map,
+            cell_size
         })
     }
 }
 
 impl event::EventHandler for AppState {
     fn update(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
-        todo!()
+        Ok(())
     }
     fn draw(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
-        todo!()
+        let mut canvas: Canvas = graphics::Canvas::from_frame(
+            context, 
+            WHITE,
+        );
+        for (row_index, row) in self.map.iter().enumerate() {
+            for (cell_index, cell) in row.iter().enumerate() {
+                cell.draw(&mut canvas, context, Point2::from([cell_index as u32, row_index as u32]), self.cell_size)?;
+            }
+        }
+
+        canvas.finish(context)
     }
 }
 
@@ -126,7 +225,7 @@ pub fn main() -> GameResult {
     let (mut contex, event_loop) = context_builder.build().expect("Failed to build context.");
 
 
-    let state = AppState::new(&mut contex, map.cells).expect("Failed to create state.");
+    let state = AppState::new(&mut contex, map.cells, cell_size).expect("Failed to create state.");
     event::run(contex, event_loop, state) // Run window event loop
 }
 
