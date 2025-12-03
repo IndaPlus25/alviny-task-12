@@ -152,11 +152,24 @@ impl event::EventHandler for AppState {
             context, 
             WHITE,
         );
+
+        // draw map
         for (row_index, row) in self.map.iter().enumerate() {
             for (cell_index, cell) in row.iter().enumerate() {
                 cell.draw(&mut canvas, context, Point2::from([cell_index as u32, row_index as u32]), self.cell_size)?;
             }
         }
+
+        // draw player sprite
+        let player_sprite = graphics::Mesh::new_circle(
+            context, 
+            graphics::DrawMode::fill(),
+            self.player_position, 
+            (self.cell_size / 5) as f32, 
+            0.67, 
+            RED
+        )?;
+        canvas.draw(&player_sprite, graphics::DrawParam::default());
 
         canvas.finish(context)
     }
