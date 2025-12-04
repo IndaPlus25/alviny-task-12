@@ -4,26 +4,30 @@ It's a Raycaster.
 
 ## Controls
 
-Use arrow keys to move around the level.
+Use WASD to move around the level, and left and right arrow keys to look around.
 
+## Map making
+
+Maps are stored in *.lvl files. These files are plaintext representations of a level map. In such a representation, every period `.` represents a walkable space, and every wall is represented by a `#` symbol. 
 ## How to run
 
 First, clone the repository:
 
-```bash
+```bat
 git clone https://github.com/IndaPlus25/alviny-task-12.git
 ```
 
 Then, navigate to the program folder and run the application:
 
-```bash
+```bat
 cd alviny-task-12
 ./raycaster.exe
 ```
 
-You can also define custom maps. To do this, create a text file with the file ending .lvl and put your level there. Every space is a walkable space, and every wall is a \# symbol. Then, run with the following:
+### Running with user-defined maps
 
-```bash
+To run with a custom map, use
 
+```bat
 ./raycaster.exe "path/to/your/level-file.lvl"
 ```
