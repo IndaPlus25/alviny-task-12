@@ -214,23 +214,40 @@ impl event::EventHandler for AppState {
             }
         }
         println!("Closest edge if any: {:?}", closest_edge);
-        // handle movement if not in wall
-            let mut movement_speed =  self.movement_speed;
-            if self.keys_held.contains(&KeyCode::LShift) {
-                movement_speed *= 2.0
+        // handle movement
+        let mut movement_speed =  self.movement_speed;
+        if self.keys_held.contains(&KeyCode::LShift) {
+            movement_speed *= 2.0
+        }
+        if self.keys_held.contains(&KeyCode::W) {
+            self.player_position.x += movement_speed * self.player_direction.cos();
+            self.player_position.y += movement_speed * self.player_direction.sin();
+        }
+        if self.keys_held.contains(&KeyCode::S) {
+            self.player_position.x -= movement_speed * self.player_direction.cos();
+            self.player_position.y -= movement_speed * self.player_direction.sin();
+        }
+        if self.keys_held.contains(&KeyCode::A) {
+            self.player_position.x += movement_speed * self.player_direction.sin();
+            self.player_position.y -= movement_speed * self.player_direction.cos();
+        }
+        if self.keys_held.contains(&KeyCode::D) {
+            self.player_position.x -= movement_speed * self.player_direction.sin();
+            self.player_position.y += movement_speed * self.player_direction.cos();
+        }
+
+        if self.keys_held.contains(&KeyCode::Left) {
+            self.player_direction -= 0.1;
+            if self.player_direction > 360.0 {
+                self.player_direction -= 360.0
             }
-            if self.keys_held.contains(&KeyCode::W) {
-                self.player_position.y -= movement_speed
+        }
+        if self.keys_held.contains(&KeyCode::Right) {
+            self.player_direction += 0.1;
+            if self.player_direction < 0.0 {
+                self.player_direction += 360.0
             }
-            if self.keys_held.contains(&KeyCode::S) {
-                self.player_position.y += movement_speed
-            }
-            if self.keys_held.contains(&KeyCode::A) {
-                self.player_position.x -= movement_speed
-            }
-            if self.keys_held.contains(&KeyCode::D) {
-                self.player_position.x += movement_speed
-            }
+        }
         Ok(())
     }
     fn draw(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
@@ -256,6 +273,20 @@ impl event::EventHandler for AppState {
             RED
         )?;
         canvas.draw(&player_sprite, graphics::DrawParam::default());
+
+        let player_direction_line = graphics::Mesh::new_line(
+            context,
+            &[
+                self.player_position, 
+                [
+                    self.player_position.x + 1.5 * self.player_radius * self.player_direction.cos(), 
+                    self.player_position.y + 1.5 * self.player_radius * self.player_direction.sin()
+                ].into()
+            ], 
+            self.player_radius/10.0, 
+            BLACK
+        )?;
+        canvas.draw(&player_direction_line, graphics::DrawParam::default());
 
         canvas.finish(context)
     }
