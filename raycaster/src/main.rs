@@ -1,6 +1,6 @@
 use core::panic;
 use std::{env::args, fs};
-use ggez::{Context, ContextBuilder, GameResult, conf, event, graphics::{self, Canvas, Color, DrawParam, Rect}, mint::Point2};
+use ggez::{Context, ContextBuilder, GameResult, conf, event, glam::bool, graphics::{self, Canvas, Color, DrawParam, Rect}, mint::Point2};
 
 const DEFAULT_CELL_SIZE: u32 = 100;
 
@@ -198,9 +198,19 @@ pub fn main() -> GameResult {
     let map_read_error_message = "Error: Unable to read map from file: ".to_owned() + &map_path + "\nSystem panic";
 
     let map_string = fs::read_to_string(map_path).expect(&map_read_error_message);
+    let split_pattern = 
+    if map_string.contains("\r\n") {
+        "\r\n"
+    } else if map_string.contains("\n") {
+        "\n"
+    } else if map_string.contains("\r") {
+        "\r"
+    } else {
+        "67" // gibberish string so it doesn't split at all
+    };
 
     let map_chars = map_string
-        .split("\n")
+        .split(split_pattern)
         .map(|element| 
             element
             .chars()
