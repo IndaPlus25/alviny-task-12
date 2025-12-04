@@ -162,26 +162,33 @@ impl event::EventHandler for AppState {
     fn update(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
 
         // handle wall collisions
-        // i heard you like evil type casting
-        let mut player_tile_position: Point2<u32> = Point2::from([(self.player_position.x/self.cell_size as f32).floor() as u32, (self.player_position.y/self.cell_size as f32).floor() as u32]);
 
         // edge case: player is on edge of map
-        if player_tile_position.x >= self.map.width {
-            player_tile_position.x = self.map.width - 1
+        // this means player is trying to excape the confines of the limited map, stop them!
+        if self.player_position.x < 0.0 {
+            self.player_position.x = 0.0
+        }
+        if self.player_position.x >= (self.map.width * self.cell_size) as f32 {
+            self.player_position.x = (self.map.width * self.cell_size) as f32 - 0.01
+        }
+        if self.player_position.y < 0.0 {
+            self.player_position.y = 0.0
+        }
+        if self.player_position.y >= (self.map.height * self.cell_size) as f32 {
+            self.player_position.y = (self.map.height * self.cell_size) as f32 - 0.01
         }
 
-        if player_tile_position.y >= self.map.width {
-            player_tile_position.y = self.map.width - 1
-        }
-
-        println!("Player tile position: ({}, {})", player_tile_position.x, player_tile_position.y);
+        // i heard you like evil type casting
+        let mut player_tile_position: Point2<u32> = Point2::from([(self.player_position.x/self.cell_size as f32).floor() as u32, (self.player_position.y/self.cell_size as f32).floor() as u32]);
+    
+        print!("Player tile position: ({}, {}), Player absolute position: ({}, {}), ", player_tile_position.x, player_tile_position.y, self.player_position.x, self.player_position.y);
+        let mut closest_edge = Direction::None;
         // if player is in wall {}
         if self.map.cells[
             player_tile_position.y as usize
         ][
             player_tile_position.x as usize
         ] == CellState::Wall {
-            let mut closest_edge = Direction::None;
             let mut min_distance = f32::INFINITY;
             for distance in [
                 (((player_tile_position.x + 1) * self.cell_size) as f32 - self.player_position.x, Direction::Right), // distance to right edge X coord
@@ -197,7 +204,7 @@ impl event::EventHandler for AppState {
                 }
 
             }
-            println!("In Wall! Closest edge: {:?}", closest_edge);
+            //println!("In Wall! Closest edge: {:?}", closest_edge);
             match closest_edge {
                 Direction::Right => self.player_position.x = ((player_tile_position.x + 1) * self.cell_size) as f32,
                 Direction::Left => self.player_position.x = ((player_tile_position.x) * self.cell_size) as f32,
@@ -206,6 +213,7 @@ impl event::EventHandler for AppState {
                 Direction::None => {},
             }
         }
+        println!("Closest edge if any: {:?}", closest_edge);
         // handle movement if not in wall
             let mut movement_speed =  self.movement_speed;
             if self.keys_held.contains(&KeyCode::LShift) {
