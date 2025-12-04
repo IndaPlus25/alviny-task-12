@@ -174,6 +174,7 @@ impl event::EventHandler for AppState {
             player_tile_position.y = self.map.width - 1
         }
 
+        println!("Player tile position: ({}, {})", player_tile_position.x, player_tile_position.y);
         // if player is in wall {}
         if self.map.cells[
             player_tile_position.y as usize
@@ -196,7 +197,7 @@ impl event::EventHandler for AppState {
                 }
 
             }
-            println!("{:?}", closest_edge);
+            println!("In Wall! Closest edge: {:?}", closest_edge);
             match closest_edge {
                 Direction::Right => self.player_position.x = ((player_tile_position.x + 1) * self.cell_size) as f32,
                 Direction::Left => self.player_position.x = ((player_tile_position.x) * self.cell_size) as f32,
@@ -206,7 +207,7 @@ impl event::EventHandler for AppState {
             }
         }
         // handle movement if not in wall
-            let mut movement_speed = 5.0;
+            let mut movement_speed =  self.movement_speed;
             if self.keys_held.contains(&KeyCode::LShift) {
                 movement_speed *= 2.0
             }
