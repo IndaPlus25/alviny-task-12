@@ -1,6 +1,6 @@
 use core::panic;
 use std::{env::args, fs};
-use ggez::{Context, ContextBuilder, GameResult, conf, event, glam::bool, graphics::{self, Canvas, Color, DrawParam, Rect}, mint::Point2};
+use ggez::{Context, ContextBuilder, GameResult, conf, event, graphics::{self, Canvas, Color, DrawParam, Rect}, mint::Point2};
 
 const DEFAULT_CELL_SIZE: u32 = 100;
 
@@ -129,22 +129,24 @@ impl CellMap {
 struct AppState {
     player_position: Point2<f32>,
     player_direction: f32, // Player direction in degrees. 0 means straight right.
-    map: Vec<Vec<CellState>>,
+    map: CellMap,
     cell_size: u32, //cell size in px
+
 }
 impl AppState {
-    fn new(_context: &mut Context, map: Vec<Vec<CellState>>, cell_size: u32) -> Option<AppState> {
+    fn new(_context: &mut Context, map: CellMap, cell_size: u32) -> Option<AppState> {
         Some(AppState{
-            player_position: Point2::from([0f32, 0f32]),
+            player_position: Point2::from([(map.width * cell_size/2) as f32, (map.height * cell_size / 2) as f32]),
             player_direction: 0f32,
             map,
-            cell_size
+            cell_size,
         })
     }
 }
 
 impl event::EventHandler for AppState {
     fn update(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
+
         Ok(())
     }
     fn draw(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
@@ -154,7 +156,7 @@ impl event::EventHandler for AppState {
         );
 
         // draw map
-        for (row_index, row) in self.map.iter().enumerate() {
+        for (row_index, row) in self.map.cells.iter().enumerate() {
             for (cell_index, cell) in row.iter().enumerate() {
                 cell.draw(&mut canvas, context, Point2::from([cell_index as u32, row_index as u32]), self.cell_size)?;
             }
@@ -248,7 +250,7 @@ pub fn main() -> GameResult {
     let (mut contex, event_loop) = context_builder.build().expect("Failed to build context.");
 
 
-    let state = AppState::new(&mut contex, map.cells, cell_size).expect("Failed to create state.");
+    let state = AppState::new(&mut contex, map, cell_size).expect("Failed to create state.");
     event::run(contex, event_loop, state) // Run window event loop
 }
 
