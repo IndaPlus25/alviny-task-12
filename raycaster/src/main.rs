@@ -1,9 +1,8 @@
-use core::panic;
+use core::{f32, panic};
 use std::{collections::HashSet, env::args, fs};
 use ggez::{Context, ContextBuilder, GameResult, conf, event, graphics::{self, Canvas, Color, DrawParam, Rect}, input::keyboard::{KeyCode, KeyInput}, mint::Point2};
 
 const DEFAULT_CELL_SIZE: u32 = 100;
-
 const DEFUALT_MOVEMENT_SPEED: f32 = 5.0;
 
 const BLACK: Color = Color::new(0f32, 0f32, 0f32, 1f32);
@@ -14,6 +13,15 @@ const WHITE: Color = Color::new(1f32, 1f32, 1f32, 1f32);
 
 const RED: Color = Color::new(1f32, 0f32, 0f32, 1f32);
 const BLUE: Color = Color::new(0f32, 0f32, 1f32, 1f32);
+
+#[derive(Debug, PartialEq)]
+enum Direction {
+    Top,
+    Right,
+    Bottom,
+    Left,
+    None,
+}
 
 #[derive(Debug, PartialEq)]
 enum CellState {Wall, Hallway}
@@ -135,6 +143,7 @@ struct AppState {
     cell_size: u32, //cell size in px
     keys_held: HashSet<KeyCode>,
     movement_speed: f32,
+    player_radius: f32
 }
 impl AppState {
     fn new(_context: &mut Context, map: CellMap, cell_size: u32, movement_speed: f32) -> Option<AppState> {
@@ -145,26 +154,74 @@ impl AppState {
             cell_size,
             keys_held: HashSet::new(),
             movement_speed,
+            player_radius: (cell_size / 5) as f32
         })
     }
 }
-
 impl event::EventHandler for AppState {
     fn update(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
-        // movement handling
-        let movement_speed = 10.0;
-        if self.keys_held.contains(&KeyCode::W) {
-            self.player_position.y -= movement_speed
+
+        // handle wall collisions
+        // i heard you like evil type casting
+        let mut player_tile_position: Point2<u32> = Point2::from([(self.player_position.x/self.cell_size as f32).floor() as u32, (self.player_position.y/self.cell_size as f32).floor() as u32]);
+
+        // edge case: player is on edge of map
+        if player_tile_position.x >= self.map.width {
+            player_tile_position.x = self.map.width - 1
         }
-        if self.keys_held.contains(&KeyCode::S) {
-            self.player_position.y += movement_speed
+
+        if player_tile_position.y >= self.map.width {
+            player_tile_position.y = self.map.width - 1
         }
-        if self.keys_held.contains(&KeyCode::A) {
-            self.player_position.x -= movement_speed
+
+        // if player is in wall {}
+        if self.map.cells[
+            player_tile_position.y as usize
+        ][
+            player_tile_position.x as usize
+        ] == CellState::Wall {
+            let mut closest_edge = Direction::None;
+            let mut min_distance = f32::INFINITY;
+            for distance in [
+                (((player_tile_position.x + 1) * self.cell_size) as f32 - self.player_position.x, Direction::Right), // distance to right edge X coord
+                (((player_tile_position.y + 1) * self.cell_size) as f32 - self.player_position.y, Direction::Bottom),// distance to bottom edge Y coord
+                (self.player_position.x - ((player_tile_position.x) * self.cell_size) as f32, Direction::Left),// distance to left edge X coord
+                (self.player_position.y - ((player_tile_position.y) * self.cell_size) as f32, Direction::Top)// distance to top edge Y coord
+            ] {
+                
+                let old_min_distance = min_distance;
+                min_distance = min_distance.min(distance.0);
+                if min_distance != old_min_distance {
+                    closest_edge = distance.1
+                }
+
+            }
+            println!("{:?}", closest_edge);
+            match closest_edge {
+                Direction::Right => self.player_position.x = ((player_tile_position.x + 1) * self.cell_size) as f32,
+                Direction::Left => self.player_position.x = ((player_tile_position.x) * self.cell_size) as f32,
+                Direction::Top => self.player_position.y = ((player_tile_position.y) * self.cell_size) as f32,
+                Direction::Bottom => self.player_position.y = ((player_tile_position.y + 1) * self.cell_size) as f32,
+                Direction::None => {},
+            }
         }
-        if self.keys_held.contains(&KeyCode::D) {
-            self.player_position.x += movement_speed
-        }
+        // handle movement if not in wall
+            let mut movement_speed = 5.0;
+            if self.keys_held.contains(&KeyCode::LShift) {
+                movement_speed *= 2.0
+            }
+            if self.keys_held.contains(&KeyCode::W) {
+                self.player_position.y -= movement_speed
+            }
+            if self.keys_held.contains(&KeyCode::S) {
+                self.player_position.y += movement_speed
+            }
+            if self.keys_held.contains(&KeyCode::A) {
+                self.player_position.x -= movement_speed
+            }
+            if self.keys_held.contains(&KeyCode::D) {
+                self.player_position.x += movement_speed
+            }
         Ok(())
     }
     fn draw(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
@@ -216,7 +273,6 @@ impl event::EventHandler for AppState {
         Ok(())
     }
 }
-
 
 
 
