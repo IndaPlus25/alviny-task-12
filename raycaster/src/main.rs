@@ -1,8 +1,10 @@
 use core::panic;
-use std::{env::args, fs};
-use ggez::{Context, ContextBuilder, GameResult, conf, event, graphics::{self, Canvas, Color, DrawParam, Rect}, mint::Point2};
+use std::{collections::HashSet, env::args, fs};
+use ggez::{Context, ContextBuilder, GameResult, conf, event, graphics::{self, Canvas, Color, DrawParam, Rect}, input::keyboard::{KeyCode, KeyInput}, mint::Point2};
 
 const DEFAULT_CELL_SIZE: u32 = 100;
+
+const DEFUALT_MOVEMENT_SPEED: f32 = 5.0;
 
 const BLACK: Color = Color::new(0f32, 0f32, 0f32, 1f32);
 
@@ -108,7 +110,7 @@ impl CellMap {
                 match cell {
                     '.' => CellState::Hallway,
                     '#' => CellState::Wall,
-                    _ => panic!("Invalid cell: {}", cell)
+                    _ => panic!("Invalid cell: {}", cell.escape_default().collect::<String>())
                 }
             }).collect()
         }).collect();
@@ -131,22 +133,38 @@ struct AppState {
     player_direction: f32, // Player direction in degrees. 0 means straight right.
     map: CellMap,
     cell_size: u32, //cell size in px
-
+    keys_held: HashSet<KeyCode>,
+    movement_speed: f32,
 }
 impl AppState {
-    fn new(_context: &mut Context, map: CellMap, cell_size: u32) -> Option<AppState> {
+    fn new(_context: &mut Context, map: CellMap, cell_size: u32, movement_speed: f32) -> Option<AppState> {
         Some(AppState{
             player_position: Point2::from([(map.width * cell_size/2) as f32, (map.height * cell_size / 2) as f32]),
             player_direction: 0f32,
             map,
             cell_size,
+            keys_held: HashSet::new(),
+            movement_speed,
         })
     }
 }
 
 impl event::EventHandler for AppState {
     fn update(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
-
+        // movement handling
+        let movement_speed = 10.0;
+        if self.keys_held.contains(&KeyCode::W) {
+            self.player_position.y -= movement_speed
+        }
+        if self.keys_held.contains(&KeyCode::S) {
+            self.player_position.y += movement_speed
+        }
+        if self.keys_held.contains(&KeyCode::A) {
+            self.player_position.x -= movement_speed
+        }
+        if self.keys_held.contains(&KeyCode::D) {
+            self.player_position.x += movement_speed
+        }
         Ok(())
     }
     fn draw(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
@@ -175,6 +193,28 @@ impl event::EventHandler for AppState {
 
         canvas.finish(context)
     }
+
+    fn key_down_event(
+            &mut self,
+            ctx: &mut Context,
+            input: ggez::input::keyboard::KeyInput,
+            _repeated: bool,
+        ) -> Result<(), ggez::GameError> {
+        if let Some(keycode) = input.keycode {
+            self.keys_held.insert(keycode);
+        }
+        Ok(())
+    }
+    fn key_up_event(
+        &mut self, 
+        _ctx: &mut Context,
+        input: KeyInput
+    ) -> Result<(), ggez::GameError> {
+        if let Some(keycode) = input.keycode {
+            self.keys_held.remove(&keycode);
+        }
+        Ok(())
+    }
 }
 
 
@@ -189,7 +229,11 @@ pub fn main() -> GameResult {
     //let map: Vec<Vec<char>> = Vec::new();
 
     let map_path: String = if let Some(arg1) = args.get(1) {
-        arg1.to_string()
+        if arg1.contains("/") {
+            arg1.to_string()
+        } else {
+            "resources/default_map.lvl".to_string()
+        }
     } else {
         "resources/default_map.lvl".to_string()
     };
@@ -209,6 +253,7 @@ pub fn main() -> GameResult {
         "\r"
     } else {
         "67" // gibberish string so it doesn't split at all
+        // 67 :hand: :hand:
     };
 
     let map_chars = map_string
@@ -229,12 +274,22 @@ pub fn main() -> GameResult {
     let cell_size: u32 = if let Some(cell_size_argument_index) = args
         .iter()
         .position (|x| 
-            (x.eq_ignore_ascii_case("-cs") || x.eq_ignore_ascii_case("--cellsize"))) 
+            (x.eq_ignore_ascii_case("-c") || x.eq_ignore_ascii_case("--cellsize"))) 
     {
         args[cell_size_argument_index+1].parse::<u32>().expect("Could not convert cell size argument")
     } else {
         DEFAULT_CELL_SIZE
     };
+
+    let movement_speed = if let Some(movement_speed_index) = args
+        .iter()
+        .position (|x| 
+            (x.eq_ignore_ascii_case("-s") || x.eq_ignore_ascii_case("--speed")))
+        {
+            args[movement_speed_index+1].parse::<f32>().expect("Could not convert cell size argument")
+        } else {
+            DEFUALT_MOVEMENT_SPEED
+        };
 
     let context_builder = ContextBuilder::new("raycaster", "alvinino")
         .window_setup(
@@ -250,7 +305,7 @@ pub fn main() -> GameResult {
     let (mut contex, event_loop) = context_builder.build().expect("Failed to build context.");
 
 
-    let state = AppState::new(&mut contex, map, cell_size).expect("Failed to create state.");
+    let state = AppState::new(&mut contex, map, cell_size, movement_speed).expect("Failed to create state.");
     event::run(contex, event_loop, state) // Run window event loop
 }
 
