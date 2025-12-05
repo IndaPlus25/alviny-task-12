@@ -32,3 +32,8 @@ To run with a custom map, use
 ```bat
 ./raycaster.exe "path/to/your/level-file.lvl"
 ```
+
+## Command-Line Arguments
+
+-c | --cellsize: Changes the size of the wall cells and thus the scale of the window.
+-s | --speed: Changes the player's movement speed.
