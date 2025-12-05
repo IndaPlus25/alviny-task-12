@@ -193,8 +193,9 @@ impl event::EventHandler for AppState {
         // Ray casting
         self.rays.clear();
         let number_of_rays: u32 = 100;
+        let fov = PI/3.0;
         for angle in 0..number_of_rays {
-            let ray_angle = self.player_direction - PI/4.0+(PI/2.0 * angle as f32/number_of_rays as f32);
+            let ray_angle = self.player_direction - fov/2.0+(fov * angle as f32/number_of_rays as f32);
             let mut length = 0.0; // ray length, in px
             let mut dest_coords = Point2::from([
                 self.player_position.x + length * ray_angle.cos(),
@@ -211,6 +212,12 @@ impl event::EventHandler for AppState {
                     self.player_position.x + length * ray_angle.cos(),
                     self.player_position.y + length * ray_angle.sin(),
                 ]);
+                if (dest_coords.y/self.cell_size as f32).floor() as u32 >= self.map.height 
+                || (dest_coords.x/self.cell_size as f32).floor() as u32 >= self.map.width 
+                || ((dest_coords.y/self.cell_size as f32).floor() as i32) < 0
+                || ((dest_coords.x/self.cell_size as f32).floor() as i32) < 0 {
+                    break
+                }
             }
 
             
@@ -364,7 +371,7 @@ impl event::EventHandler for AppState {
         )?;
         minimap.draw(&player_direction_line, graphics::DrawParam::default());
 
-        minimap.finish(context);
+        let _ = minimap.finish(context);
 
         let mut player_view = graphics::Canvas::from_frame(context, BLACK);
         let max_fov = max(self.map.height * self.cell_size, self.map.width *self.cell_size) as f32;
