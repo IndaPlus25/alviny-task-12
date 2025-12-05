@@ -370,7 +370,7 @@ impl event::EventHandler for AppState {
         let max_fov = max(self.map.height * self.cell_size, self.map.width *self.cell_size) as f32;
         for (ray_index, ray) in self.rays.iter().enumerate() {
             let wall_sprite_width = self.display_width/self.rays.len() as f32;
-            let wall_sprite_height = 50.0*self.display_height/ray.length;
+            let wall_sprite_height = self.display_height/((ray.length / self.cell_size as f32) * (ray.direction - self.player_direction).cos());
             let wall_sprite_color = Color::new(
                 1.0-2.0*ray.length/max_fov, 
                 1.0-2.0*ray.length/max_fov,
