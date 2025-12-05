@@ -1,6 +1,6 @@
 use core::{f32, panic};
-use std::{collections::HashSet, env::args, f32::consts::PI, fs};
-use ggez::{Context, ContextBuilder, GameResult, conf, event, graphics::{self, Canvas, Color, DrawParam, Rect}, input::keyboard::{KeyCode, KeyInput}, mint::Point2};
+use std::{cmp::max, collections::HashSet, env::args, f32::consts::PI, fs};
+use ggez::{Context, ContextBuilder, GameResult, conf, event, graphics::{self, Canvas, Color, DrawParam, Image, ImageFormat, Rect}, input::keyboard::{KeyCode, KeyInput}, mint::Point2};
 
 const DEFAULT_CELL_SIZE: u32 = 100;
 const DEFUALT_MOVEMENT_SPEED: f32 = 5.0;
@@ -23,7 +23,7 @@ enum Direction {
     None,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 enum CellState {Wall, Hallway}
 impl CellState {
     fn draw(&self,  canvas: &mut Canvas, ctx: &mut Context, coords: Point2<u32>, cell_size: u32) -> GameResult {
@@ -104,7 +104,7 @@ impl CellState {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct CellMap {
     cells: Vec<Vec<CellState>>,
     width: u32,
@@ -162,18 +162,28 @@ struct AppState {
     movement_speed: f32,
     player_radius: f32,
     rays: Vec<Ray>,
+    display_width: f32,
+    display_height: f32,
+    minimap_buffer: Image,
 }
 impl AppState {
-    fn new(_context: &mut Context, map: CellMap, cell_size: u32, movement_speed: f32) -> Option<AppState> {
+    fn new(context: &mut Context, map: CellMap, cell_size: u32, movement_speed: f32, display_width: f32, display_height: f32) -> Option<AppState> {
         Some(AppState{
             player_position: Point2::from([(map.width * cell_size/2) as f32, (map.height * cell_size / 2) as f32]),
             player_direction: 0f32,
-            map,
+            map: map.clone(),
             cell_size,
             keys_held: HashSet::new(),
             movement_speed,
             player_radius: (cell_size / 5) as f32,
             rays: vec![],
+            display_width,
+            display_height,
+            minimap_buffer: Image::new_canvas_image(
+                context, 
+                ImageFormat::Bgra8UnormSrgb, 
+                cell_size * map.width, 
+                cell_size * map.height, 1),
         })
     }
 }
@@ -301,9 +311,10 @@ impl event::EventHandler for AppState {
         Ok(())
     }
     fn draw(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
-        let mut minimap: Canvas = graphics::Canvas::from_frame(
+        let mut minimap: Canvas = graphics::Canvas::from_image(
             context, 
-            WHITE,
+            self.minimap_buffer.clone(),
+            BLACK
         );
 
         // draw map
@@ -353,7 +364,37 @@ impl event::EventHandler for AppState {
         )?;
         minimap.draw(&player_direction_line, graphics::DrawParam::default());
 
-        minimap.finish(context)
+        minimap.finish(context);
+
+        let mut player_view = graphics::Canvas::from_frame(context, BLACK);
+        let max_fov = max(self.map.height * self.cell_size, self.map.width *self.cell_size) as f32;
+        for (ray_index, ray) in self.rays.iter().enumerate() {
+            let wall_sprite_width = self.display_width/self.rays.len() as f32;
+            let wall_sprite_height = 50.0*self.display_height/ray.length;
+            let wall_sprite_color = Color::new(
+                1.0-2.0*ray.length/max_fov, 
+                1.0-2.0*ray.length/max_fov,
+                1.0-2.0*ray.length/max_fov, 
+                1f32
+            );
+
+            let wall_sprite = graphics::Mesh::new_rectangle(
+                context,
+                graphics::DrawMode::fill(), 
+                Rect::new(
+                    wall_sprite_width * ray_index as f32,
+                    (self.display_height - wall_sprite_height) / 2.0,
+                    wall_sprite_width,
+                    wall_sprite_height,
+            ), 
+            wall_sprite_color)?;
+
+            player_view.draw(&wall_sprite, graphics::DrawParam::default());
+            player_view.draw(&self.minimap_buffer, graphics::DrawParam::default().dest([self.display_width, 0.0]))
+
+        }
+        //player_view.draw(&minimap, graphics::DrawParam::default());
+        player_view.finish(context)
     }
 
     fn key_down_event(
@@ -457,13 +498,13 @@ pub fn main() -> GameResult {
         )
         .window_mode(
             conf::WindowMode::default()
-                .dimensions((cell_size * map.width) as f32, (cell_size * map.height) as f32) // Set window dimensions
+                .dimensions((cell_size * map.width) as f32 + 4.0/3.0 * (cell_size * map.height) as f32, (cell_size * map.height) as f32) // Set window dimensions
                 .resizable(false), // Fix window size
         );
     let (mut contex, event_loop) = context_builder.build().expect("Failed to build context.");
 
 
-    let state = AppState::new(&mut contex, map, cell_size, movement_speed).expect("Failed to create state.");
+    let state = AppState::new(&mut contex, map.clone(), cell_size, movement_speed, 4.0/3.0 * (cell_size * map.height) as f32, (cell_size * map.height) as f32).expect("Failed to create state.");
     event::run(contex, event_loop, state) // Run window event loop
 }
 
