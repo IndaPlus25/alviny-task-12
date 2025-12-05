@@ -1,5 +1,5 @@
 use core::{f32, panic};
-use std::{collections::HashSet, env::args, fs};
+use std::{collections::HashSet, env::args, f32::consts::PI, fs};
 use ggez::{Context, ContextBuilder, GameResult, conf, event, graphics::{self, Canvas, Color, DrawParam, Rect}, input::keyboard::{KeyCode, KeyInput}, mint::Point2};
 
 const DEFAULT_CELL_SIZE: u32 = 100;
@@ -7,7 +7,7 @@ const DEFUALT_MOVEMENT_SPEED: f32 = 5.0;
 
 const BLACK: Color = Color::new(0f32, 0f32, 0f32, 1f32);
 
-const GRAY: Color = Color::new(128.0/255.0, 128.0/255.0, 128.0/255.0, 1f32);
+const GRAY: Color = Color::new(103.0/255.0, 103.0/255.0, 103.0/255.0, 1f32);
 
 const WHITE: Color = Color::new(1f32, 1f32, 1f32, 1f32);
 
@@ -136,14 +136,32 @@ impl CellMap {
     }
 }
 
+struct Ray {
+    source: Point2<f32>, // Coords, in px
+    direction: f32, // Relative angle of the Ray, in radians
+    length: f32, // Length of the Ray in px
+}
+impl Ray {
+    fn new(source: Point2<f32>,
+    direction: f32,
+    length: f32,) -> Ray {
+        Ray{
+            source,
+            direction,
+            length,
+        }
+    }
+}
+
 struct AppState {
     player_position: Point2<f32>,
-    player_direction: f32, // Player direction in degrees. 0 means straight right.
+    player_direction: f32, // Player direction in radians. 0 means straight right.
     map: CellMap,
     cell_size: u32, //cell size in px
     keys_held: HashSet<KeyCode>,
     movement_speed: f32,
-    player_radius: f32
+    player_radius: f32,
+    rays: Vec<Ray>,
 }
 impl AppState {
     fn new(_context: &mut Context, map: CellMap, cell_size: u32, movement_speed: f32) -> Option<AppState> {
@@ -154,12 +172,42 @@ impl AppState {
             cell_size,
             keys_held: HashSet::new(),
             movement_speed,
-            player_radius: (cell_size / 5) as f32
+            player_radius: (cell_size / 5) as f32,
+            rays: vec![],
         })
     }
 }
 impl event::EventHandler for AppState {
     fn update(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
+
+        // Ray casting
+        self.rays.clear();
+        let number_of_rays: u32 = 100;
+        for angle in 0..number_of_rays {
+            let ray_angle = self.player_direction - PI/4.0+(PI/2.0 * angle as f32/number_of_rays as f32);
+            let mut length = 0.0; // ray length, in px
+            let mut dest_coords = Point2::from([
+                self.player_position.x + length * ray_angle.cos(),
+                self.player_position.y + length * ray_angle.sin(),
+
+            ]);
+            while self.map.cells[
+                (dest_coords.y/self.cell_size as f32).floor() as usize
+            ][
+                (dest_coords.x/self.cell_size as f32).floor() as usize
+            ] != CellState::Wall {
+                length += 1.0;
+                dest_coords = Point2::from([
+                    self.player_position.x + length * ray_angle.cos(),
+                    self.player_position.y + length * ray_angle.sin(),
+                ]);
+            }
+
+            
+
+            self.rays.push(Ray::new(self.player_position, ray_angle, length));
+        }
+
 
         // handle wall collisions
 
@@ -183,6 +231,7 @@ impl event::EventHandler for AppState {
     
         print!("Player tile position: ({}, {}), Player absolute position: ({}, {}), ", player_tile_position.x, player_tile_position.y, self.player_position.x, self.player_position.y);
         let mut closest_edge = Direction::None;
+
         // if player is in wall {}
         if self.map.cells[
             player_tile_position.y as usize
@@ -238,20 +287,21 @@ impl event::EventHandler for AppState {
 
         if self.keys_held.contains(&KeyCode::Left) {
             self.player_direction -= 0.1;
-            if self.player_direction > 360.0 {
-                self.player_direction -= 360.0
+            if self.player_direction > 2.0*PI {
+                self.player_direction -= 2.0*PI
             }
         }
         if self.keys_held.contains(&KeyCode::Right) {
             self.player_direction += 0.1;
             if self.player_direction < 0.0 {
-                self.player_direction += 360.0
+                self.player_direction += 2.0*PI
             }
         }
+        
         Ok(())
     }
     fn draw(&mut self, context: &mut Context) -> std::result::Result<(), ggez::GameError> {
-        let mut canvas: Canvas = graphics::Canvas::from_frame(
+        let mut minimap: Canvas = graphics::Canvas::from_frame(
             context, 
             WHITE,
         );
@@ -259,8 +309,23 @@ impl event::EventHandler for AppState {
         // draw map
         for (row_index, row) in self.map.cells.iter().enumerate() {
             for (cell_index, cell) in row.iter().enumerate() {
-                cell.draw(&mut canvas, context, Point2::from([cell_index as u32, row_index as u32]), self.cell_size)?;
+                cell.draw(&mut minimap, context, Point2::from([cell_index as u32, row_index as u32]), self.cell_size)?;
             }
+        }
+
+        // draw rays cast
+        for ray in &self.rays {
+            let ray_sprite = graphics::Mesh::new_line(
+                context, 
+                &[
+                    ray.source, 
+                    [
+                        ray.source.x + ray.length * ray.direction.cos(),
+                        ray.source.y + ray.length * ray.direction.sin(),
+                    ].into(),
+                ], 
+                (self.cell_size/15) as f32, BLUE)?;
+            minimap.draw(&ray_sprite, graphics::DrawParam::default());
         }
 
         // draw player sprite
@@ -269,10 +334,10 @@ impl event::EventHandler for AppState {
             graphics::DrawMode::fill(),
             self.player_position, 
             (self.cell_size / 5) as f32, 
-            0.67, 
+            0.67, // six seven
             RED
         )?;
-        canvas.draw(&player_sprite, graphics::DrawParam::default());
+        minimap.draw(&player_sprite, graphics::DrawParam::default());
 
         let player_direction_line = graphics::Mesh::new_line(
             context,
@@ -286,9 +351,9 @@ impl event::EventHandler for AppState {
             self.player_radius/10.0, 
             BLACK
         )?;
-        canvas.draw(&player_direction_line, graphics::DrawParam::default());
+        minimap.draw(&player_direction_line, graphics::DrawParam::default());
 
-        canvas.finish(context)
+        minimap.finish(context)
     }
 
     fn key_down_event(
@@ -317,9 +382,6 @@ impl event::EventHandler for AppState {
 
 
 pub fn main() -> GameResult {
-
-    
-
     let args: Vec<String> = args().collect();
 
     //let map: Vec<Vec<char>> = Vec::new();
